@@ -1,6 +1,5 @@
 import { conmysql } from '../db.js';
 
-// LISTAR PRODUCTOS
 export const getProductos = async (req, res) => {
     try {
         const [result] = await conmysql.query('SELECT * FROM productos');
@@ -15,8 +14,7 @@ export const postProducto = async (req, res) => {
     try {
         const { prod_codigo, prod_nombre, prod_stock, prod_precio } = req.body;
         
-        // Obtenemos el nombre del archivo subido
-        const prod_imagen = req.file ? `/uploads/${req.file.filename}` : null;
+        const prod_imagen = req.file ? req.file.location : null;
 
         const [result] = await conmysql.query(
             'INSERT INTO productos (prod_codigo, prod_nombre, prod_stock, prod_precio, prod_imagen) VALUES (?, ?, ?, ?, ?)',
@@ -34,8 +32,9 @@ export const putProducto = async (req, res) => {
         const { id } = req.params;
         const { prod_codigo, prod_nombre, prod_stock, prod_precio } = req.body;
         
-        // Si hay un archivo nuevo, lo usamos, si no, mantén la lógica que necesites
-        const prod_imagen = req.file ? `/uploads/${req.file.filename}` : req.body.prod_imagen;
+        // CAMBIO: Si hay archivo nuevo, tomamos su nueva URL de Sirv
+        // Si no, mantenemos la URL que ya estaba en la base de datos (req.body.prod_imagen)
+        const prod_imagen = req.file ? req.file.location : req.body.prod_imagen;
 
         const [result] = await conmysql.query(
             'UPDATE productos SET prod_codigo = ?, prod_nombre = ?, prod_stock = ?, prod_precio = ?, prod_imagen = ? WHERE prod_id = ?',
@@ -44,13 +43,13 @@ export const putProducto = async (req, res) => {
         
         if (result.affectedRows === 0) return res.status(404).json({ message: "Producto no encontrado" });
         
-        res.send({ message: "Producto actualizado" });
+        res.send({ message: "Producto actualizado", prod_imagen });
     } catch (error) {
         return res.status(500).json({ message: "Error al actualizar producto" });
     }
 };
 
-// ELIMINAR PRODUCTO
+// ELIMINAR PRODUCTO - (Se mantiene igual)
 export const deleteProducto = async (req, res) => {
     try {
         const { id } = req.params;

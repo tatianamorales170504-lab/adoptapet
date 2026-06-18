@@ -1,20 +1,26 @@
+import { S3Client } from '@aws-sdk/client-s3';
 import multer from 'multer';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import multerS3 from 'multer-s3';
 
-// Definir __dirname para ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // Esto apunta a C:\API2026_1\uploads
-    cb(null, path.resolve(__dirname, '../../uploads')); 
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
+const s3 = new S3Client({
+  region: 'us-east-1', 
+  endpoint: 'https://s3.sirv.com',
+  credentials: {
+    accessKeyId: 'tatianamorales170504@gmail.com', 
+    secretAccessKey: 'boDJzzAl2yvNqyvHMFzgWg92GCKAeKkCHwNtGNAiJCFEa9Em' 
   }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage: multerS3({
+    s3: s3,
+    bucket: 'tiendaimagenes',
+    acl: 'public-read', 
+    key: (req, file, cb) => {
+      cb(null, `productos/${Date.now()}-${file.originalname}`); // Se guardarán en la carpeta 'productos'
+    }
+  })
+});
+
 export default upload;
