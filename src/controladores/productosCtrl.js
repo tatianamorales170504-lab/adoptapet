@@ -14,7 +14,8 @@ export const postProducto = async (req, res) => {
     try {
         const { prod_codigo, prod_nombre, prod_stock, prod_precio } = req.body;
         
-        const prod_imagen = req.file ? req.file.location : null;
+        // CORRECCIÓN: Construimos la URL pública de la CDN de Sirv
+        const prod_imagen = req.file ? `https://tiendaimagenes.sirv.com/${req.file.key}` : null;
 
         const [result] = await conmysql.query(
             'INSERT INTO productos (prod_codigo, prod_nombre, prod_stock, prod_precio, prod_imagen) VALUES (?, ?, ?, ?, ?)',
@@ -32,9 +33,8 @@ export const putProducto = async (req, res) => {
         const { id } = req.params;
         const { prod_codigo, prod_nombre, prod_stock, prod_precio } = req.body;
         
-        // CAMBIO: Si hay archivo nuevo, tomamos su nueva URL de Sirv
-        // Si no, mantenemos la URL que ya estaba en la base de datos (req.body.prod_imagen)
-        const prod_imagen = req.file ? req.file.location : req.body.prod_imagen;
+        // CORRECCIÓN: Si hay archivo nuevo, generamos la URL pública. Si no, mantenemos la que ya estaba.
+        const prod_imagen = req.file ? `https://tiendaimagenes.sirv.com/${req.file.key}` : req.body.prod_imagen;
 
         const [result] = await conmysql.query(
             'UPDATE productos SET prod_codigo = ?, prod_nombre = ?, prod_stock = ?, prod_precio = ?, prod_imagen = ? WHERE prod_id = ?',
@@ -49,7 +49,7 @@ export const putProducto = async (req, res) => {
     }
 };
 
-// ELIMINAR PRODUCTO - (Se mantiene igual)
+// ELIMINAR PRODUCTO
 export const deleteProducto = async (req, res) => {
     try {
         const { id } = req.params;
