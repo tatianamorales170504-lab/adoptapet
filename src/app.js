@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import clientesRoutes from './routes/clientes.routes.js';
 import productosRoutes from './routes/productos.routes.js';
 import authRoutes from './routes/auth.routes.js';
-
+import pedidosRoutes from './routes/pedidos.routes.js';
 // Configuración para __dirname en ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
