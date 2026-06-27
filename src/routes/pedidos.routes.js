@@ -1,7 +1,7 @@
 // src/routes/pedidos.routes.js
 import { Router } from 'express';
 import { crearPedido } from '../controladores/pedidosCtrl.js';
-import { verifyToken } from '../middlewares/auth.js'; // Ajusta la ruta a tu middleware de auth
+import { verificarToken } from '../middlewares/auth.js'; // Ajusta la ruta a tu middleware de auth
 
 const router = Router();
 
