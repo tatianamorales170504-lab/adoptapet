@@ -121,5 +121,49 @@ export const guardarPedido = async (req, res) => {
     } finally {
         conexion.release();
     }
+// 1. Obtener todos los pedidos (con datos del cliente)
+export const obtenerPedidos = async (req, res) => {
+    try {
+        const [rows] = await conmysql.query(`
+            SELECT p.*, c.cli_nombre 
+            FROM pedidos p 
+            INNER JOIN clientes c ON p.cli_id = c.cli_id 
+            ORDER BY p.ped_fecha DESC
+        `);
+        res.json(rows);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ mensaje: "Error al obtener la lista de pedidos" });
+    }
+};
 
+// 2. Obtener un pedido por ID con su detalle y productos
+export const obtenerPedidoPorId = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Consultar el pedido
+        const [pedido] = await conmysql.query("SELECT * FROM pedidos WHERE ped_id = ?", [id]);
+        
+        if (pedido.length === 0) {
+            return res.status(404).json({ mensaje: "Pedido no encontrado" });
+        }
+
+        // Consultar el detalle del pedido junto con el nombre del producto
+        const [detalles] = await conmysql.query(`
+            SELECT pd.*, pr.prod_nombre 
+            FROM pedidos_detalle pd
+            INNER JOIN productos pr ON pd.prod_id = pr.prod_id
+            WHERE pd.ped_id = ?
+        `, [id]);
+
+        res.json({
+            pedido: pedido[0],
+            detalles: detalles
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ mensaje: "Error al obtener el detalle del pedido" });
+    }
+};
 };
