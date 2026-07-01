@@ -1,15 +1,21 @@
-// src/routes/pedidos.routes.js
-// src/routes/pedidos.routes.js
 import { Router } from 'express';
-import { crearPedido, obtenerPedidos, obtenerPedidoPorId } from '../controladores/pedidosCtrl.js';
+import {
+    guardarPedido,
+    getPedidos,
+    getPedidoxId
+} from '../controladores/pedidosCtrl.js';
+
 import { verificarToken } from '../middlewares/auth.js';
 
 const router = Router();
 
-router.post('/pedidos', verificarToken, crearPedido);
+// Crear pedido
+router.post('/pedidos', verificarToken, guardarPedido);
+
 // Obtener todos los pedidos
-router.get('/pedidos', verificarToken, obtenerPedidos);
-// Obtener un pedido específico por su ID
-router.get('/pedidos/:id', verificarToken, obtenerPedidoPorId);
+router.get('/pedidos', verificarToken, getPedidos);
+
+// Obtener un pedido por ID
+router.get('/pedidos/:id', verificarToken, getPedidoxId);
 
 export default router;
