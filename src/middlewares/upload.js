@@ -16,15 +16,12 @@ const upload = multer({
   storage: multerS3({
     s3: s3,
     bucket: 'tiendaimagenes',
-    // IMPORTANTE: Al quitar el 'acl', evitamos conflictos de permisos de firma
     key: (req, file, cb) => {
       const fileName = `productos/${Date.now()}-${file.originalname}`;
       cb(null, fileName);
     }
   })
 });
-
-// Esta función helper te servirá en tu controlador para guardar la URL correcta
 export const getSirvUrl = (key) => `https://tiendaimagenes.sirv.com/${key}`;
 
 export default upload;
