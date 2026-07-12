@@ -1,9 +1,12 @@
 import { conmysql } from '../db.js';
+import { enviarNotificacion } from '../services/notificaciones.js';
+
 export const guardarPedido = async (req, res) => {
     const conexion = await conmysql.getConnection();
 
     try {
         await conexion.beginTransaction();
+
         const {
             cli_id,
             cli_identificacion,
@@ -18,12 +21,15 @@ export const guardarPedido = async (req, res) => {
             ped_estado,
             detalle
         } = req.body;
-        // Validaciones
+
+        // Validar detalle
         if (!detalle || detalle.length === 0) {
             throw new Error("El pedido no tiene productos.");
         }
+
         let idCliente = Number(cli_id);
-        // Cliente nuevo
+
+        // Registrar cliente si es nuevo
         if (idCliente === 0) {
 
             const [cliente] = await conexion.query(
@@ -51,7 +57,8 @@ export const guardarPedido = async (req, res) => {
 
             idCliente = cliente.insertId;
         }
-        // Pedido
+
+        // Registrar pedido
         const [pedido] = await conexion.query(
             `INSERT INTO pedidos
             (
@@ -68,23 +75,29 @@ export const guardarPedido = async (req, res) => {
                 ped_estado
             ]
         );
+
         const ped_id = pedido.insertId;
-        // Detalle
+
+        // Registrar detalle
         for (const item of detalle) {
+
             if (Number(item.det_cantidad) <= 0) {
                 throw new Error(`Cantidad inválida del producto ${item.prod_id}`);
             }
+
             if (Number(item.det_precio) <= 0) {
                 throw new Error(`Precio inválido del producto ${item.prod_id}`);
             }
-            // Verificar existencia del producto
+
             const [producto] = await conexion.query(
                 "SELECT prod_id FROM productos WHERE prod_id=?",
                 [item.prod_id]
             );
+
             if (producto.length === 0) {
                 throw new Error(`El producto ${item.prod_id} no existe.`);
             }
+
             await conexion.query(
                 `INSERT INTO pedidos_detalle
                 (
@@ -102,7 +115,42 @@ export const guardarPedido = async (req, res) => {
                 ]
             );
         }
+
+        // Confirmar transacción
         await conexion.commit();
+
+        // Buscar administradores con token Firebase
+        const [admins] = await conexion.query(`
+            SELECT usr_push_token
+            FROM usuarios
+            WHERE usr_rol = 'admin'
+        `);
+
+        // Enviar notificación
+        for (const admin of admins) {
+
+            if (!admin.usr_push_token) continue;
+
+            try {
+
+                await enviarNotificacion(
+                    admin.usr_push_token,
+                    "Nuevo pedido",
+                    `Se registró el pedido #${ped_id}`,
+                    {
+                        ped_id: String(ped_id),
+                        tipo: "nuevo_pedido"
+                    }
+                );
+
+            } catch (error) {
+
+                console.error("Error enviando notificación:", error);
+
+            }
+
+        }
+
         res.status(201).json({
             ok: true,
             mensaje: "Pedido registrado correctamente.",
@@ -111,23 +159,28 @@ export const guardarPedido = async (req, res) => {
         });
 
     } catch (error) {
+
         await conexion.rollback();
+
         console.error(error);
+
         res.status(500).json({
             ok: false,
             mensaje: error.message
         });
 
     } finally {
-        conexion.release();
-    }
 
+        conexion.release();
+
+    }
 };
+
 export const getPedidos = async (req, res) => {
     try {
-        // Consulta principal: une pedidos con clientes y usuarios
+
         const [pedidos] = await conmysql.query(`
-            SELECT 
+            SELECT
                 p.ped_id,
                 p.cli_id,
                 c.cli_nombre,
@@ -139,45 +192,52 @@ export const getPedidos = async (req, res) => {
             ORDER BY p.ped_fecha DESC
         `);
 
-        // Obtener los detalles de todos los pedidos
         const [detalles] = await conmysql.query(`
-            SELECT 
+            SELECT
                 d.det_id,
                 d.ped_id,
                 d.prod_id,
                 pr.prod_nombre,
-                  pr.prod_imagen,
+                pr.prod_imagen,
                 d.det_cantidad,
                 d.det_precio
             FROM pedidos_detalle d
             LEFT JOIN productos pr ON d.prod_id = pr.prod_id
         `);
 
-        // Unir los detalles a cada pedido
         const pedidosConDetalles = pedidos.map(pedido => {
-            const detallesPedido = detalles.filter(d => d.ped_id === pedido.ped_id);
-            return { ...pedido, detalles: detallesPedido };
+
+            const detallesPedido = detalles.filter(
+                d => d.ped_id === pedido.ped_id
+            );
+
+            return {
+                ...pedido,
+                detalles: detallesPedido
+            };
+
         });
 
         res.json(pedidosConDetalles);
+
     } catch (error) {
-        console.error('Error al obtener los pedidos:', error);
-        return res.status(500).json({ message: 'Error al obtener los pedidos.' });
+
+        console.error(error);
+
+        res.status(500).json({
+            message: 'Error al obtener los pedidos.'
+        });
+
     }
 };
 
 export const getPedidoxId = async (req, res) => {
     try {
+
         const { id } = req.params;
 
-        // Validar que venga el ID
-        if (!id) {
-            return res.status(400).json({ message: 'El ID del pedido es obligatorio.' });
-        }
-
-        // Consulta principal: datos del pedido y cliente
         const [pedidos] = await conmysql.query(`
-            SELECT 
+            SELECT
                 p.ped_id,
                 p.cli_id,
                 c.cli_nombre,
@@ -190,19 +250,20 @@ export const getPedidoxId = async (req, res) => {
         `, [id]);
 
         if (pedidos.length === 0) {
-            return res.status(404).json({ message: 'Pedido no encontrado.' });
+            return res.status(404).json({
+                message: 'Pedido no encontrado.'
+            });
         }
 
         const pedido = pedidos[0];
 
-        // Obtener detalles del pedido
         const [detalles] = await conmysql.query(`
-            SELECT 
+            SELECT
                 d.det_id,
                 d.ped_id,
                 d.prod_id,
                 pr.prod_nombre,
-                 pr.prod_imagen,
+                pr.prod_imagen,
                 d.det_cantidad,
                 d.det_precio
             FROM pedidos_detalle d
@@ -215,7 +276,12 @@ export const getPedidoxId = async (req, res) => {
         res.json(pedido);
 
     } catch (error) {
-        console.error('Error al obtener el pedido por ID:', error);
-        return res.status(500).json({ message: 'Error al obtener el pedido.' });
+
+        console.error(error);
+
+        res.status(500).json({
+            message: 'Error al obtener el pedido.'
+        });
+
     }
 };
