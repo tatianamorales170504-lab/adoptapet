@@ -1,4 +1,5 @@
 import { conmysql } from '../db.js';
+import admin from 'firebase-admin';
 
 export const guardarPedido = async (req, res) => {
     const conexion = await conmysql.getConnection();
@@ -30,7 +31,6 @@ export const guardarPedido = async (req, res) => {
 
         // Registrar cliente si es nuevo
         if (idCliente === 0) {
-
             const [cliente] = await conexion.query(
                 `INSERT INTO clientes
                 (
@@ -53,7 +53,6 @@ export const guardarPedido = async (req, res) => {
                     cli_ciudad
                 ]
             );
-
             idCliente = cliente.insertId;
         }
 
@@ -79,11 +78,9 @@ export const guardarPedido = async (req, res) => {
 
         // Registrar detalle
         for (const item of detalle) {
-
             if (Number(item.det_cantidad) <= 0) {
                 throw new Error(`Cantidad inválida del producto ${item.prod_id}`);
             }
-
             if (Number(item.det_precio) <= 0) {
                 throw new Error(`Precio inválido del producto ${item.prod_id}`);
             }
@@ -118,6 +115,46 @@ export const guardarPedido = async (req, res) => {
         // Confirmar transacción
         await conexion.commit();
 
+        // ====================================================
+        // NOTIFICACIÓN AL ADMINISTRADOR (Proceso independiente)
+        // ====================================================
+        try {
+            const [usuario] = await conmysql.query(
+                "SELECT usr_usuario FROM usuarios WHERE usr_id = ?",
+                [usr_id]
+            );
+
+            const nombreUsuario = usuario.length > 0 ? usuario[0].usr_usuario : "Un vendedor";
+
+            // Buscamos administradores (asegurado con rol 'admin')
+            const [admins] = await conmysql.query(`
+                SELECT usr_push_token
+                FROM usuarios
+                WHERE usr_rol = 'admin'
+                AND usr_push_token IS NOT NULL
+                AND usr_push_token <> ''
+            `);
+
+            for (const adminUser of admins) {
+                const message = {
+                    notification: {
+                        title: "🛒 Nueva venta",
+                        body: `${nombreUsuario} registró un nuevo pedido.`
+                    },
+                    data: {
+                        tipo: "pedido",
+                        ped_id: ped_id.toString()
+                    },
+                    token: adminUser.usr_push_token
+                };
+
+                await admin.messaging().send(message);
+            }
+            console.log("Notificaciones enviadas correctamente.");
+        } catch (error) {
+            console.error("Error al enviar notificación (no afecta al pedido):", error);
+        }
+
         res.status(201).json({
             ok: true,
             mensaje: "Pedido registrado correctamente.",
@@ -126,20 +163,14 @@ export const guardarPedido = async (req, res) => {
         });
 
     } catch (error) {
-
         await conexion.rollback();
-
         console.error(error);
-
         res.status(500).json({
             ok: false,
             mensaje: error.message
         });
-
     } finally {
-
         conexion.release();
-
     }
 };
 
