@@ -1,10 +1,13 @@
 import { conmysql } from '../db.js';
-import { messaging } from '../config/firebase.js';
+import admin from '../config/firebase.js';
+
 
 export const guardarPedido = async (req, res) => {
+
     const conexion = await conmysql.getConnection();
 
     try {
+
         await conexion.beginTransaction();
 
         const {
@@ -22,15 +25,18 @@ export const guardarPedido = async (req, res) => {
             detalle
         } = req.body;
 
-        // Validar detalle
+
         if (!detalle || detalle.length === 0) {
             throw new Error("El pedido no tiene productos.");
         }
 
+
         let idCliente = Number(cli_id);
 
-        // Registrar cliente si es nuevo
+
+        // Registrar cliente nuevo
         if (idCliente === 0) {
+
             const [cliente] = await conexion.query(
                 `INSERT INTO clientes
                 (
@@ -53,8 +59,11 @@ export const guardarPedido = async (req, res) => {
                     cli_ciudad
                 ]
             );
+
             idCliente = cliente.insertId;
         }
+
+
 
         // Registrar pedido
         const [pedido] = await conexion.query(
@@ -74,25 +83,37 @@ export const guardarPedido = async (req, res) => {
             ]
         );
 
+
         const ped_id = pedido.insertId;
+
+
 
         // Registrar detalle
         for (const item of detalle) {
+
+
             if (Number(item.det_cantidad) <= 0) {
                 throw new Error(`Cantidad inválida del producto ${item.prod_id}`);
             }
+
+
             if (Number(item.det_precio) <= 0) {
                 throw new Error(`Precio inválido del producto ${item.prod_id}`);
             }
+
+
 
             const [producto] = await conexion.query(
                 "SELECT prod_id FROM productos WHERE prod_id=?",
                 [item.prod_id]
             );
 
+
             if (producto.length === 0) {
                 throw new Error(`El producto ${item.prod_id} no existe.`);
             }
+
+
 
             await conexion.query(
                 `INSERT INTO pedidos_detalle
@@ -110,176 +131,149 @@ export const guardarPedido = async (req, res) => {
                     item.det_precio
                 ]
             );
+
         }
 
-        // Confirmar transacción
+
+
         await conexion.commit();
 
-        // ====================================================
-        // NOTIFICACIÓN AL ADMINISTRADOR (Proceso independiente)
-        // ====================================================
+
+
+        // ==========================================
+        // NOTIFICACIÓN SOLO AL ADMINISTRADOR
+        // ==========================================
+
         try {
+
+
             const [usuario] = await conmysql.query(
-                "SELECT usr_usuario FROM usuarios WHERE usr_id = ?",
+                "SELECT usr_usuario FROM usuarios WHERE usr_id=?",
                 [usr_id]
             );
 
-            const nombreUsuario = usuario.length > 0 ? usuario[0].usr_usuario : "Un vendedor";
 
-            // Buscamos administradores (asegurado con rol 'admin')
+            const nombreUsuario =
+                usuario.length > 0
+                    ? usuario[0].usr_usuario
+                    : "Un vendedor";
+
+
+
             const [admins] = await conmysql.query(`
-                SELECT usr_push_token
+                SELECT 
+                    usr_usuario,
+                    usr_push_token
                 FROM usuarios
                 WHERE usr_rol = 'admin'
                 AND usr_push_token IS NOT NULL
                 AND usr_push_token <> ''
             `);
 
-            for (const adminUser of admins) {
-                const message = {
-                    notification: {
-                        title: "🛒 Nueva venta",
-                        body: `${nombreUsuario} registró un nuevo pedido.`
-                    },
-                    data: {
-                        tipo: "pedido",
-                        ped_id: ped_id.toString()
-                    },
-                    token: adminUser.usr_push_token
-                };
 
-                await messaging.send(message);
-            }
-            console.log("Notificaciones enviadas correctamente.");
-        } catch (error) {
-            console.error("Error al enviar notificación (no afecta al pedido):", error);
-        }
 
-        res.status(201).json({
-            ok: true,
-            mensaje: "Pedido registrado correctamente.",
-            ped_id,
-            cli_id: idCliente
-        });
-
-    } catch (error) {
-        await conexion.rollback();
-        console.error(error);
-        res.status(500).json({
-            ok: false,
-            mensaje: error.message
-        });
-    } finally {
-        conexion.release();
-    }
-};
-
-export const getPedidos = async (req, res) => {
-    try {
-
-        const [pedidos] = await conmysql.query(`
-            SELECT
-                p.ped_id,
-                p.cli_id,
-                c.cli_nombre,
-                p.ped_fecha,
-                p.usr_id,
-                p.ped_estado
-            FROM pedidos p
-            LEFT JOIN clientes c ON p.cli_id = c.cli_id
-            ORDER BY p.ped_fecha DESC
-        `);
-
-        const [detalles] = await conmysql.query(`
-            SELECT
-                d.det_id,
-                d.ped_id,
-                d.prod_id,
-                pr.prod_nombre,
-                pr.prod_imagen,
-                d.det_cantidad,
-                d.det_precio
-            FROM pedidos_detalle d
-            LEFT JOIN productos pr ON d.prod_id = pr.prod_id
-        `);
-
-        const pedidosConDetalles = pedidos.map(pedido => {
-
-            const detallesPedido = detalles.filter(
-                d => d.ped_id === pedido.ped_id
+            console.log(
+                "Administradores que recibirán notificación:",
+                admins
             );
 
-            return {
-                ...pedido,
-                detalles: detallesPedido
-            };
 
-        });
 
-        res.json(pedidosConDetalles);
+            for (const adminUser of admins) {
 
-    } catch (error) {
 
-        console.error(error);
+                const message = {
 
-        res.status(500).json({
-            message: 'Error al obtener los pedidos.'
-        });
+                    notification: {
 
-    }
-};
+                        title: "🛒 Nueva venta",
 
-export const getPedidoxId = async (req, res) => {
-    try {
+                        body:
+                        `${nombreUsuario} registró un nuevo pedido.`
 
-        const { id } = req.params;
+                    },
 
-        const [pedidos] = await conmysql.query(`
-            SELECT
-                p.ped_id,
-                p.cli_id,
-                c.cli_nombre,
-                p.ped_fecha,
-                p.usr_id,
-                p.ped_estado
-            FROM pedidos p
-            LEFT JOIN clientes c ON p.cli_id = c.cli_id
-            WHERE p.ped_id = ?
-        `, [id]);
 
-        if (pedidos.length === 0) {
-            return res.status(404).json({
-                message: 'Pedido no encontrado.'
-            });
+                    data: {
+
+                        tipo: "pedido",
+
+                        ped_id: ped_id.toString()
+
+                    },
+
+
+                    token: adminUser.usr_push_token
+
+                };
+
+
+
+                const respuesta =
+                    await admin.messaging().send(message);
+
+
+                console.log(
+                    "Firebase respuesta:",
+                    respuesta
+                );
+
+            }
+
+
+            console.log(
+                "Notificaciones enviadas correctamente."
+            );
+
+
+        } catch(error) {
+
+            console.error(
+                "Error al enviar notificación (no afecta al pedido):",
+                error
+            );
+
         }
 
-        const pedido = pedidos[0];
 
-        const [detalles] = await conmysql.query(`
-            SELECT
-                d.det_id,
-                d.ped_id,
-                d.prod_id,
-                pr.prod_nombre,
-                pr.prod_imagen,
-                d.det_cantidad,
-                d.det_precio
-            FROM pedidos_detalle d
-            LEFT JOIN productos pr ON d.prod_id = pr.prod_id
-            WHERE d.ped_id = ?
-        `, [id]);
 
-        pedido.detalles = detalles;
 
-        res.json(pedido);
+        res.status(201).json({
 
-    } catch (error) {
+            ok:true,
+
+            mensaje:"Pedido registrado correctamente.",
+
+            ped_id,
+
+            cli_id:idCliente
+
+        });
+
+
+
+    } catch(error) {
+
+
+        await conexion.rollback();
+
 
         console.error(error);
 
+
         res.status(500).json({
-            message: 'Error al obtener el pedido.'
+
+            ok:false,
+
+            mensaje:error.message
+
         });
 
+
+    } finally {
+
+        conexion.release();
+
     }
+
 };
