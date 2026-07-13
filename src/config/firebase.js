@@ -6,9 +6,10 @@ if (getApps().length === 0) {
         throw new Error("La variable FIREBASE_SERVICE_ACCOUNT no está configurada.");
     }
 
-    // Limpiamos los saltos de línea para que JSON.parse no falle
-    const rawValue = process.env.FIREBASE_SERVICE_ACCOUNT;
-    const serviceAccount = JSON.parse(rawValue.replace(/\\n/g, '\n'));
+    // Decodificamos el Base64 a string y luego a JSON
+    const base64Value = process.env.FIREBASE_SERVICE_ACCOUNT;
+    const jsonString = Buffer.from(base64Value, 'base64').toString('utf-8');
+    const serviceAccount = JSON.parse(jsonString);
     
     initializeApp({
         credential: cert(serviceAccount)
