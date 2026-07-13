@@ -1,20 +1,18 @@
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getMessaging } from 'firebase-admin/messaging';
 
-// Usamos getApps() directamente en lugar de admin.apps
 if (getApps().length === 0) {
     if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-        throw new Error("La variable FIREBASE_SERVICE_ACCOUNT no está configurada en Render.");
+        throw new Error("La variable FIREBASE_SERVICE_ACCOUNT no está configurada.");
     }
 
-    const serviceAccount = JSON.parse(
-        process.env.FIREBASE_SERVICE_ACCOUNT.replace(/\\n/g, '\n')
-    );
+    // Limpiamos los saltos de línea para que JSON.parse no falle
+    const rawValue = process.env.FIREBASE_SERVICE_ACCOUNT;
+    const serviceAccount = JSON.parse(rawValue.replace(/\\n/g, '\n'));
     
     initializeApp({
         credential: cert(serviceAccount)
     });
 }
 
-// Exportamos la instancia de mensajería para usarla en tus controladores
 export const messaging = getMessaging();
