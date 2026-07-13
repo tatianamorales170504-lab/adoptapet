@@ -1,5 +1,5 @@
 import { conmysql } from '../db.js';
-import admin from '../config/firebase.js';
+import { messaging } from '../config/firebase.js';
 
 export const guardarPedido = async (req, res) => {
     const conexion = await conmysql.getConnection();
@@ -148,7 +148,7 @@ export const guardarPedido = async (req, res) => {
                     token: adminUser.usr_push_token
                 };
 
-                await admin.messaging().send(message);
+                await messaging.send(message);
             }
             console.log("Notificaciones enviadas correctamente.");
         } catch (error) {
