@@ -7,12 +7,26 @@ export const getDashboardStats = async (req, res) => {
         const [clientes] = await pool.query('SELECT COUNT(*) as total FROM clientes');
         const [aprobadas] = await pool.query('SELECT COUNT(*) as total FROM solicitudes_adopcion WHERE estado = "aprobada"');
 
-        // Accedemos a [0].total porque el resultado de pool.query es un array de filas
+        // NUEVO: Consultar las solicitudes recientes (ej. las últimas 5)
+        const [solicitudesRecientes] = await pool.query(`
+            SELECT 
+                s.id, 
+                s.estado, 
+                m.nombre as nombreMascota, 
+                c.nombre as nombreCliente 
+            FROM solicitudes_adopcion s
+            JOIN mascotas m ON s.mascota_id = m.id
+            JOIN clientes c ON s.cliente_id = c.id
+            ORDER BY s.id DESC
+            LIMIT 5
+        `);
+
         res.json({
             totalMascotas: mascotas[0].total,
             solicitudesPendientes: solicitudes[0].total,
             totalClientes: clientes[0].total,
-            adopcionesExitosas: aprobadas[0].total
+            adopcionesExitosas: aprobadas[0].total,
+            solicitudesRecientes: solicitudesRecientes // <--- Las enviamos al frontend
         });
         
     } catch (error) {
