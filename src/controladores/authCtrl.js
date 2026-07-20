@@ -49,21 +49,26 @@ export const registrar = async (req, res) => {
         // Intentar revertir la transacción
         await conmysql.query('ROLLBACK').catch(() => {});
 
-        // --- IMPRESIÓN DETALLADA EN CONSOLA DE RENDER ---
-        console.error("=== ERROR DETALLADO EN REGISTRO ===");
-        console.error("Código:", error.code);
-        console.error("Errno:", error.errno);
-        console.error("Estado SQL:", error.sqlState);
-        console.error("Mensaje SQL:", error.sqlMessage);
-        console.error("Mensaje general:", error.message);
+        // Registro interno seguro en los logs de Render (solo para ti)
+        console.error("=== ERROR EN REGISTRO ===", error.message);
 
+        // Si es un error de duplicado en MySQL (Correo o Cédula ya existen)
+        if (error.code === 'ER_DUP_ENTRY' || error.errno === 1062) {
+            let mensajeAmigable = 'Este dato ya se encuentra registrado en el sistema.';
+            
+            if (error.sqlMessage && error.sqlMessage.includes('identificacion')) {
+                mensajeAmigable = 'Este número de cédula ya se encuentra registrado.';
+            } else if (error.sqlMessage && error.sqlMessage.includes('email')) {
+                mensajeAmigable = 'Este correo electrónico ya está registrado.';
+            }
+
+            // CAMBIO CLAVE: Retornamos 400 (Bad Request) en vez de 500 para limpiar la consola del navegador
+            return res.status(400).json({ message: mensajeAmigable });
+        }
+
+        // Para cualquier error real de servidor no previsto
         return res.status(500).json({
-            error_tipo: "FALLO_BASE_DATOS",
-            code: error.code,
-            errno: error.errno,
-            sqlState: error.sqlState,
-            sqlMessage: error.sqlMessage,
-            message: error.message
+            message: 'Ocurrió un error interno en el servidor.'
         });
     } 
 };
