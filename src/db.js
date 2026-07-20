@@ -14,5 +14,8 @@ export const conmysql = createPool({
     database: BD_DATABASE,
     user: BD_USER,
     password: BD_PASSWORD,
-    port: BD_PORT
+    port: BD_PORT,
+    ssl: {
+        rejectUnauthorized: false // Necesario para conexiones remotas en la nube
+    }
 });
