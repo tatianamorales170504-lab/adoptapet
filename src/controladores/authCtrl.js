@@ -2,10 +2,9 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { conmysql } from '../db.js';
 
-
 export const registrar = async (req, res) => {
     const { email, password, nombre, apellido, identificacion, telefono, direccion, rol } = req.body;
-    
+
     // Validaciones básicas
     if (!email || !password || !nombre || !apellido) {
         return res.status(400).json({ message: 'Campos obligatorios faltantes' });
@@ -14,54 +13,53 @@ export const registrar = async (req, res) => {
     const rolUsuario = rol || 'cliente';
 
     try {
-        // Iniciamos transacción para asegurar integridad
+        // Iniciamos transacción
         await conmysql.query('START TRANSACTION');
 
         const claveEncriptada = await bcrypt.hash(password, 10);
-        
-        // 1. Intentar insertar en usuarios
-        // Si el email ya existe, aquí se dispara el error ER_DUP_ENTRY
+
         const [userResult] = await conmysql.query(
-            'INSERT INTO usuarios (email, password, rol, activo) VALUES (?, ?, ?, 1)', 
+            'INSERT INTO usuarios (email, password, rol, activo) VALUES (?, ?, ?, 1)',
             [email, claveEncriptada, rolUsuario]
         );
-        
+
         const nuevoUsuarioId = userResult.insertId;
 
-        // 2. Intentar insertar en clientes
-        // Si la identificación ya existe, aquí se dispara el error ER_DUP_ENTRY
         if (rolUsuario === 'cliente') {
             await conmysql.query(
-                'INSERT INTO clientes (usuario_id, nombre, apellido, identificacion, telefono, direccion) VALUES (?, ?, ?, ?, ?, ?)', 
-                [nuevoUsuarioId, nombre, apellido, identificacion || null, telefono || null, direccion || null]
+                'INSERT INTO clientes (usuario_id, nombre, apellido, identificacion, telefono, direccion) VALUES (?, ?, ?, ?, ?, ?)',
+                [
+                    nuevoUsuarioId,
+                    nombre,
+                    apellido,
+                    identificacion || null,
+                    telefono || null,
+                    direccion || null
+                ]
             );
         }
 
-        // Si llegamos aquí, todo fue correcto
         await conmysql.query('COMMIT');
 
-        // Notificación protegida
-        try {
-            await enviarNotificacion(1, "Nuevo Registro", `Nuevo cliente registrado: ${nombre} ${apellido}`);
-        } catch (notificacionError) {
-            console.error("Error en notificación (no crítico):", notificacionError);
-        }
-
-        return res.status(201).json({ message: 'Usuario registrado con éxito' });
+        return res.status(201).json({
+            message: 'Usuario registrado con éxito'
+        });
 
     } catch (error) {
-    // Intentar revertir la transacción
-    await conmysql.query('ROLLBACK').catch(() => {});
 
-    console.error("ERROR COMPLETO:", error);
+        // Intentar revertir la transacción
+        await conmysql.query('ROLLBACK').catch(() => {});
 
-    return res.status(500).json({
-        code: error.code,
-        errno: error.errno,
-        sqlState: error.sqlState,
-        sqlMessage: error.sqlMessage,
-        message: error.message
-    });
+        console.error("ERROR COMPLETO:", error);
+
+        return res.status(500).json({
+            code: error.code,
+            errno: error.errno,
+            sqlState: error.sqlState,
+            sqlMessage: error.sqlMessage,
+            message: error.message
+        });
+    }   // <-- ESTA LLAVE FALTABA
 };
 
 export const login = async (req, res) => {
@@ -115,4 +113,3 @@ export const guardarTokenPush = async (req, res) => {
         return res.status(500).json({ message: 'Error al actualizar token' });
     }
 };
-}
