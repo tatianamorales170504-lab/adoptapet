@@ -50,22 +50,18 @@ export const registrar = async (req, res) => {
         return res.status(201).json({ message: 'Usuario registrado con éxito' });
 
     } catch (error) {
-        // Revertir cambios si algo falló
-        await conmysql.query('ROLLBACK');
+    // Intentar revertir la transacción
+    await conmysql.query('ROLLBACK').catch(() => {});
 
-        // Manejo específico de duplicados (MySQL 1062)
-        if (error.code === 'ER_DUP_ENTRY') {
-            if (error.sqlMessage.includes('email')) {
-                return res.status(409).json({ message: 'El correo electrónico ya está registrado.' });
-            }
-            if (error.sqlMessage.includes('identificacion')) {
-                return res.status(409).json({ message: 'La identificación ya está registrada en el sistema.' });
-            }
-        }
+    console.error("ERROR COMPLETO:", error);
 
-        console.error("Error crítico en registro:", error);
-        return res.status(500).json({ message: 'Error interno en el servidor.' });
-    }
+    return res.status(500).json({
+        code: error.code,
+        errno: error.errno,
+        sqlState: error.sqlState,
+        sqlMessage: error.sqlMessage,
+        message: error.message
+    });
 };
 
 export const login = async (req, res) => {
@@ -119,3 +115,4 @@ export const guardarTokenPush = async (req, res) => {
         return res.status(500).json({ message: 'Error al actualizar token' });
     }
 };
+}
