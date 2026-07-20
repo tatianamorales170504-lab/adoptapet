@@ -5,7 +5,7 @@ console.log({
   host: BD_HOST,
   database: BD_DATABASE,
   user: BD_USER,
-  password: BD_PASSWORD ? "OK" : "VACÍA",
+  password: BD_PASSWORD,
   port: BD_PORT
 });
 
