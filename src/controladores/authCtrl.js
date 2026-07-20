@@ -46,20 +46,26 @@ export const registrar = async (req, res) => {
         });
 
     } catch (error) {
-
         // Intentar revertir la transacción
         await conmysql.query('ROLLBACK').catch(() => {});
 
-        console.error("ERROR COMPLETO:", error);
+        // --- IMPRESIÓN DETALLADA EN CONSOLA DE RENDER ---
+        console.error("=== ERROR DETALLADO EN REGISTRO ===");
+        console.error("Código:", error.code);
+        console.error("Errno:", error.errno);
+        console.error("Estado SQL:", error.sqlState);
+        console.error("Mensaje SQL:", error.sqlMessage);
+        console.error("Mensaje general:", error.message);
 
         return res.status(500).json({
+            error_tipo: "FALLO_BASE_DATOS",
             code: error.code,
             errno: error.errno,
             sqlState: error.sqlState,
             sqlMessage: error.sqlMessage,
             message: error.message
         });
-    }   // <-- ESTA LLAVE FALTABA
+    } 
 };
 
 export const login = async (req, res) => {
@@ -80,8 +86,6 @@ export const login = async (req, res) => {
 
         const token = jwt.sign({ id: usuarioBD.id, rol: usuarioBD.rol }, process.env.JWT_SECRET || 'FirmaSecretaAdoptaPet', { expiresIn: '2h' });
 
-        // RESPUESTA CORREGIDA:
-        // Incluimos el objeto cliente completo (incluyendo el id) para el frontend
         return res.json({ 
             token, 
             usuario: { 
@@ -97,8 +101,12 @@ export const login = async (req, res) => {
         });
         
     } catch (error) {
-        console.error("Error en login:", error);
-        return res.status(500).json({ message: 'Error en servidor' });
+        console.error("=== ERROR DETALLADO EN LOGIN ===", error);
+        return res.status(500).json({ 
+            message: 'Error en servidor',
+            sqlMessage: error.sqlMessage,
+            code: error.code 
+        });
     }
 };
 
@@ -109,7 +117,11 @@ export const guardarTokenPush = async (req, res) => {
         await conmysql.query('UPDATE usuarios SET token_push = ? WHERE id = ?', [token_push, usuario_id]);
         return res.json({ message: 'Token actualizado' });
     } catch (error) {
-        console.error("Error al actualizar token:", error);
-        return res.status(500).json({ message: 'Error al actualizar token' });
+        console.error("=== ERROR DETALLADO EN PUSH ===", error);
+        return res.status(500).json({ 
+            message: 'Error al actualizar token',
+            sqlMessage: error.sqlMessage,
+            code: error.code 
+        });
     }
 };
