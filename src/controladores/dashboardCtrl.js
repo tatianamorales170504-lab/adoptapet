@@ -4,7 +4,7 @@ export const getDashboardStats = async (req, res) => {
     try {
         const [mascotas] = await pool.query('SELECT COUNT(*) as total FROM mascotas');
         const [solicitudes] = await pool.query('SELECT COUNT(*) as total FROM solicitudes_adopcion WHERE estado = "pendiente"');
-        const [clientes] = await pool.query('SELECT COUNT(*) as total FROM usuarios');
+        const [clientes] = await pool.query('SELECT COUNT(*) as total FROM clientes');
         const [aprobadas] = await pool.query('SELECT COUNT(*) as total FROM solicitudes_adopcion WHERE estado = "aprobada"');
 
         // Accedemos a [0].total porque el resultado de pool.query es un array de filas
