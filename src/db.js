@@ -1,20 +1,18 @@
 import {createPool} from "mysql2/promise";
-import {BD_HOST,DB_USER,DB_PASSWORD,BD_DATABASE,DB_PORT} from './config.js'
+import {BD_HOST, BD_USER, BD_PASSWORD, BD_DATABASE, BD_PORT} from './config.js'
+
 console.log({
   host: BD_HOST,
   database: BD_DATABASE,
-  user: DB_USER,
-  password: DB_PASSWORD ? "OK" : "VACÍA",
-  port: DB_PORT
+  user: BD_USER,
+  password: BD_PASSWORD ? "OK" : "VACÍA",
+  port: BD_PORT
 });
-export const conmysql=createPool({
-    host:BD_HOST,
-    database:BD_DATABASE,
-    user:DB_USER,
-    password:DB_PASSWORD,
-    port:DB_PORT,
-    ssl: {
-        rejectUnauthorized: false
-    }
-    
-})
+
+export const conmysql = createPool({
+    host: BD_HOST,
+    database: BD_DATABASE,
+    user: BD_USER,
+    password: BD_PASSWORD,
+    port: BD_PORT
+});
