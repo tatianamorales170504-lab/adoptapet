@@ -3,10 +3,14 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-import clientesRoutes from './routes/clientes.routes.js';
-import productosRoutes from './routes/productos.routes.js';
+
 import authRoutes from './routes/auth.routes.js';
-import pedidosRoutes from './routes/pedidos.routes.js';
+
+import mascotasRoutes from './routes/mascotas.routes.js';
+import solicitudesRoutes from './routes/solicitudes.routes.js';
+import favoritosRoutes from './routes/favoritos.routes.js';
+import clientesRutas from './routes/cliente.routes.js';
+import dashboardRoutes from './routes/dashboard.routes.js';
 // Configuración para __dirname en ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,10 +34,11 @@ app.use(express.json());
 
 // Rutas
 app.use('/api', authRoutes);
-app.use('/api', clientesRoutes);
-app.use('/api', productosRoutes);
-app.use('/api', pedidosRoutes);
-
+app.use('/api/mascotas', mascotasRoutes);
+app.use('/api/solicitudes', solicitudesRoutes);
+app.use('/api/favoritos', favoritosRoutes);
+app.use('/api/clientes', clientesRutas);
+app.use('/api/dashboard', dashboardRoutes);
 // Ruta para verificar si el servidor responde correctamente
 app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'OK', message: 'Servidor operativo' });

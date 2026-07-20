@@ -4,7 +4,7 @@ dotenv.config();
 import app from './app.js';
 
 // Usamos el puerto de las variables de entorno o el 3000 por defecto
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 app.listen(PORT, () => {
     console.log('Servidor ejecutándose en el puerto', PORT);
