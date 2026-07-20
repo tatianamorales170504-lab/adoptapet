@@ -5,7 +5,7 @@ console.log({
   host: BD_HOST,
   database: BD_DATABASE,
   user: BD_USER,
-  password: BD_PASSWORD,
+  passwordLength: BD_PASSWORD ? BD_PASSWORD.length : 0,
   port: BD_PORT
 });
 
