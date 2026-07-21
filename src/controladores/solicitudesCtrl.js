@@ -1,5 +1,24 @@
 import { conmysql as pool } from '../db.js';
-import { enviarNotificacion } from '../services/pushService.js';
+import { messaging } from '../config/firebase.js';
+
+// Función auxiliar interna para buscar el token de un usuario y enviar la notificación
+const enviarPushPorUsuarioId = async (usuarioId, titulo, cuerpo) => {
+    try {
+        const [rows] = await pool.query(
+            'SELECT token_push FROM usuarios WHERE id = ? AND token_push IS NOT NULL', 
+            [usuarioId]
+        );
+
+        if (rows.length > 0 && rows[0].token_push) {
+            await messaging.send({
+                token: rows[0].token_push,
+                notification: { title: titulo, body: cuerpo }
+            });
+        }
+    } catch (error) {
+        console.error("Error al enviar notificación push:", error);
+    }
+};
 
 // 1. CREAR SOLICITUD (El usuario normal la envía)
 export const registrarSolicitud = async (req, res) => {
@@ -32,8 +51,11 @@ export const registrarSolicitud = async (req, res) => {
 
         await connection.commit();
 
-        // NOTIFICACIÓN: Avisar al Administrador (ID 1)
-        await enviarNotificacion(1, "Nueva Solicitud", "Hay una nueva solicitud de adopción pendiente.");
+        // NOTIFICACIÓN: Avisar a los Administradores (Buscamos a todos los que tengan rol de administrador)
+        const [admins] = await pool.query("SELECT id FROM usuarios WHERE rol = 'administrador'");
+        for (const admin of admins) {
+            await enviarPushPorUsuarioId(admin.id, "Nueva Solicitud", "Hay una nueva solicitud de adopción pendiente.");
+        }
 
         res.status(201).json({ message: "Éxito" });
     } catch (error) {
@@ -62,10 +84,7 @@ export const obtenerSolicitudes = async (req, res) => {
 };
 
 // 3. OBTENER SOLICITUDES POR CLIENTE (Para ver el historial del usuario)
-// 3. OBTENER SOLICITUDES POR CLIENTE (Corregido)
 export const obtenerSolicitudesPorCliente = async (req, res) => {
-    // CAMBIO: Asegúrate de que el nombre aquí coincida con lo que pusiste en routes.js
-    // Si en tu ruta dice /cliente/:cliente_id, aquí debe ser req.params.cliente_id
     const { cliente_id } = req.params; 
 
     try {
@@ -75,7 +94,7 @@ export const obtenerSolicitudesPorCliente = async (req, res) => {
             JOIN mascotas m ON s.mascota_id = m.id
             WHERE s.cliente_id = ?
             ORDER BY s.creado_en DESC
-        `, [cliente_id]); // Aquí también usamos la variable correcta
+        `, [cliente_id]);
         
         res.json(solicitudes);
     } catch (error) {
@@ -107,9 +126,13 @@ export const gestionarSolicitud = async (req, res) => {
 
         await connection.commit();
 
-        // NOTIFICACIÓN: Avisar al Cliente
+        // NOTIFICACIÓN: Avisar al Cliente buscando su usuario_id a partir de su cliente_id
         if (cliente_id) {
-            await enviarNotificacion(cliente_id, "Estado de Solicitud", `Tu solicitud ha sido: ${estado}`);
+            const [clienteRows] = await pool.query("SELECT usuario_id FROM clientes WHERE id = ?", [cliente_id]);
+            if (clienteRows.length > 0) {
+                const usuarioIdCliente = clienteRows[0].usuario_id;
+                await enviarPushPorUsuarioId(usuarioIdCliente, "Estado de Solicitud", `Tu solicitud ha sido: ${estado}`);
+            }
         }
 
         res.json({ message: `Solicitud ${estado} correctamente.` });
