@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { conmysql } from '../db.js';
+import { messaging } from '../config/firebase.js'; // <--- 1. Importas messaging aquí arriba
 
 export const registrar = async (req, res) => {
     const { email, password, nombre, apellido, identificacion, telefono, direccion, rol } = req.body;
@@ -41,6 +42,26 @@ export const registrar = async (req, res) => {
 
         await conmysql.query('COMMIT');
 
+        // === 2. ENVIAR NOTIFICACIÓN PUSH AL ADMINISTRADOR ===
+        try {
+            const [admins] = await conmysql.query(
+                'SELECT token_push FROM usuarios WHERE rol = "administrador" AND token_push IS NOT NULL'
+            );
+            
+            for (const admin of admins) {
+                await messaging.send({
+                    token: admin.token_push,
+                    notification: {
+                        title: '¡Nuevo Cliente Registrado!',
+                        body: `Se ha registrado el cliente: ${nombre} ${apellido}`
+                    }
+                });
+            }
+        } catch (pushError) {
+            console.error("Error al enviar push de nuevo usuario al admin:", pushError);
+        }
+        // ===================================================
+
         return res.status(201).json({
             message: 'Usuario registrado con éxito'
         });
@@ -62,7 +83,6 @@ export const registrar = async (req, res) => {
                 mensajeAmigable = 'Este correo electrónico ya está registrado.';
             }
 
-            // CAMBIO CLAVE: Retornamos 400 (Bad Request) en vez de 500 para limpiar la consola del navegador
             return res.status(400).json({ message: mensajeAmigable });
         }
 
